@@ -10,6 +10,8 @@ const __dirname = path.dirname(__filename);
 const nodeEnv = process.env.NODE_ENV || 'development';
 const envFile = nodeEnv === 'test' ? '.env.test' : '.env';
 dotenv.config({ path: path.resolve(__dirname, '../../', envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
@@ -18,8 +20,8 @@ const envSchema = z.object({
   DATABASE_URL_TEST: z.string().optional(),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters long'),
   JWT_EXPIRES_IN: z.string().default('8h'),
-  CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
-  UPLOAD_DIR: z.string().default('./uploads'),
+  CLIENT_ORIGIN: z.string().default('*'),
+  UPLOAD_DIR: z.string().default(process.env.VERCEL ? '/tmp/uploads' : './uploads'),
   MAX_FILE_SIZE_BYTES: z.coerce
     .number()
     .int()

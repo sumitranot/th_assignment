@@ -30,7 +30,16 @@ export const createApp = () => {
   // CORS configuration
   app.use(
     cors({
-      origin: env.CLIENT_ORIGIN,
+      origin: (origin, callback) => {
+        if (!origin || env.CLIENT_ORIGIN === '*' || origin === env.CLIENT_ORIGIN) {
+          return callback(null, true);
+        }
+        const origins = env.CLIENT_ORIGIN.split(',').map(s => s.trim());
+        if (origins.includes(origin) || origin.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -43,7 +52,7 @@ export const createApp = () => {
       pinoHttp({
         logger,
         autoLogging: {
-          ignore: req => req.url === '/api/health',
+          ignore: req => req.url === '/api/health' || req.url === '/health',
         },
       })
     );
@@ -54,23 +63,29 @@ export const createApp = () => {
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
   // Health check endpoint
-  app.get('/api/health', (_req, res) => {
+  app.get(['/api/health', '/health'], (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
 
+  app.get(['/api', '/'], (_req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Document Approval Workflow API' });
+  });
+
   // Swagger Documentation endpoint
-  const openApiPath = path.resolve(__dirname, '../openapi.yaml');
+  const localOpenApiPath = path.resolve(__dirname, '../openapi.yaml');
+  const rootOpenApiPath = path.resolve(process.cwd(), 'backend/openapi.yaml');
+  const openApiPath = fs.existsSync(localOpenApiPath) ? localOpenApiPath : rootOpenApiPath;
   if (fs.existsSync(openApiPath)) {
     const file = fs.readFileSync(openApiPath, 'utf8');
     const swaggerDoc = yaml.parse(file);
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+    app.use(['/api/docs', '/docs'], swaggerUi.serve, swaggerUi.setup(swaggerDoc));
   }
 
   // Authentication routes
-  app.use('/api/auth', authRoutes);
+  app.use(['/api/auth', '/auth'], authRoutes);
 
   // Documents workflow routes
-  app.use('/api/documents', documentsRoutes);
+  app.use(['/api/documents', '/documents'], documentsRoutes);
 
   // 404 handler for unknown routes
   app.use(notFound);
