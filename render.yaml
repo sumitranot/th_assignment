@@ -1,0 +1,34 @@
+services:
+  # Backend API Web Service
+  - type: web
+    name: document-approval-backend
+    env: node
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install && npm run db:generate
+    releaseCommand: npm run db:migrate && npm run seed
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: document-workflow-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+
+databases:
+  # Managed PostgreSQL Database
+  - name: document-workflow-db
+    databaseName: document_workflow
+    user: postgres
+    plan: starter
