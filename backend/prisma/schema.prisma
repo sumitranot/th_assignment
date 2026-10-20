@@ -1,0 +1,56 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  submitter
+  reviewer
+}
+
+enum DocumentStatus {
+  pending
+  approved
+  rejected
+}
+
+model User {
+  id           String     @id @default(uuid())
+  username     String     @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime   @default(now())
+  submitted    Document[] @relation("Submitter")
+  reviewed     Document[] @relation("Reviewer")
+
+  @@map("users")
+}
+
+model Document {
+  id               String         @id @default(uuid())
+  title            String         @db.VarChar(200)
+  description      String?
+  textContent      String?
+  filePath         String?
+  originalFilename String?
+  mimeType         String?
+  fileSize         Int?
+  status           DocumentStatus @default(pending)
+  submitterId      String
+  submitter        User           @relation("Submitter", fields: [submitterId], references: [id], onDelete: Cascade)
+  reviewerId       String?
+  reviewer         User?          @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  reviewComment    String?        @db.VarChar(1000)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([submitterId, createdAt])
+  @@index([status, createdAt])
+  @@map("documents")
+}
