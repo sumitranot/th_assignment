@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
@@ -7,6 +8,15 @@ import { logger } from '../lib/logger.js';
  * { "error": { "code": string, "message": string, "details"?: object } }
  */
 export const errorHandler = (err, req, res, _next) => {
+  // Clean up any uploaded file on disk if an error occurred during request handling
+  if (req.file?.path && fs.existsSync(req.file.path)) {
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      // ignore cleanup error
+    }
+  }
+
   // Handle JSON parse errors from express.json()
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({

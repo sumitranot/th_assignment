@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { ValidationError } from '../lib/errors.js';
 
 /**
@@ -31,6 +32,13 @@ export const validate = schemas => {
     }
 
     if (Object.keys(errorDetails).length > 0) {
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {
+          // ignore cleanup error
+        }
+      }
       return next(new ValidationError('Request validation failed', errorDetails));
     }
 
