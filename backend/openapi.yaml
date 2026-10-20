@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Document Approval Workflow API
+  version: 1.0.0
+  description: >
+    Production-ready REST API for the Document Approval Workflow take-home project.
+    Provides document submission for submitters, and review/approval workflow for reviewers.
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      operationId: getHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server is healthy and running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/auth/login:
+    post:
+      summary: User login
+      operationId: login
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: alice
+                password:
+                  type: string
+                  example: Passw0rd!demo
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /api/auth/me:
+    get:
+      summary: Get current authenticated user
+      operationId: getMe
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/documents:
+    post:
+      summary: Submit a new document (Submitter only)
+      operationId: createDocument
+      tags:
+        - Documents
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                  example: Q3 Financial Summary
+                description:
+                  type: string
+                  maxLength: 1000
+                  example: Operational spending and quarterly earnings.
+                textContent:
+                  type: string
+                  example: Revenue reached $1.8M with 14% growth.
+                file:
+                  type: string
+                  format: binary
+                  description: Optional document attachment (max 5 MB; pdf, txt, md, doc, docx, png, jpg, jpeg).
+      responses:
+        '201':
+          description: Document submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLargeError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaTypeError'
+
+    get:
+      summary: List documents (Submitters see own, Reviewers see all)
+      operationId: listDocuments
+      tags:
+        - Documents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+          description: Filter by document review status
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Number of records per page (max 50)
+      responses:
+        '200':
+          description: Paginated document list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/documents/{id}:
+    get:
+      summary: Retrieve single document detail
+      operationId: getDocumentById
+      tags:
+        - Documents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document UUID
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/documents/{id}/file:
+    get:
+      summary: Download attached document file
+      operationId: downloadDocumentFile
+      tags:
+        - Documents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document UUID
+      responses:
+        '200':
+          description: File binary stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/documents/{id}/status:
+    patch:
+      summary: Decide document status (Reviewer only)
+      operationId: updateDocumentStatus
+      tags:
+        - Documents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+                  example: approved
+                comment:
+                  type: string
+                  maxLength: 1000
+                  example: Approved. Well structured proposal with clear metrics.
+      responses:
+        '200':
+          description: Document reviewed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          example: alice
+        name:
+          type: string
+          example: Alice Submitter
+        role:
+          type: string
+          enum: [submitter, reviewer]
+          example: submitter
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Q3 Financial Summary
+        description:
+          type: string
+          nullable: true
+          example: Operational spending and quarterly earnings.
+        textContent:
+          type: string
+          nullable: true
+          example: Revenue reached $1.8M with 14% growth.
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          example: pending
+        submitter:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              example: Alice Submitter
+        file:
+          type: object
+          nullable: true
+          properties:
+            originalFilename:
+              type: string
+              example: financial_report.pdf
+            mimeType:
+              type: string
+              example: application/pdf
+            size:
+              type: integer
+              example: 1048576
+            downloadUrl:
+              type: string
+              example: /api/documents/7f8a1234-abcd-5678-ef01-123456789abc/file
+        reviewedBy:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              example: Riley Reviewer
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewComment:
+          type: string
+          nullable: true
+          example: Approved without reservations.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+
+    ErrorEnvelope:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: validation_error
+            message:
+              type: string
+              example: Human-readable error summary
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              example:
+                title:
+                  - Title cannot be empty
+
+  responses:
+    ValidationError:
+      description: Bad request / validation failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: validation_error
+              message: Request validation failed
+              details:
+                title:
+                  - Title cannot be empty
+
+    UnauthorizedError:
+      description: Authentication token missing, expired, or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: unauthorized
+              message: Authentication token is missing
+
+    ForbiddenError:
+      description: Authenticated user lacks permission for this role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: forbidden
+              message: 'Access forbidden: required role reviewer'
+
+    NotFoundError:
+      description: Resource was not found or access is restricted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: not_found
+              message: Document not found
+
+    ConflictError:
+      description: Invalid state transition (e.g. document already reviewed)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: invalid_transition
+              message: Document has already been decided and cannot be transitioned
+
+    PayloadTooLargeError:
+      description: Uploaded file size exceeds the 5 MB limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: file_too_large
+              message: File exceeds the maximum allowed size of 5 MB
+
+    UnsupportedMediaTypeError:
+      description: Uploaded file extension or MIME type is not supported
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: unsupported_file_type
+              message: File extension is not allowed
+
+    RateLimitError:
+      description: Too many requests sent to the endpoint
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: rate_limited
+              message: Too many login attempts. Please try again later.

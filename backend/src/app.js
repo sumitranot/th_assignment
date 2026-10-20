@@ -2,11 +2,20 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import swaggerUi from 'swagger-ui-express';
+import yaml from 'yaml';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import documentsRoutes from './modules/documents/documents.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Creates and configures the Express application instance.
@@ -49,11 +58,19 @@ export const createApp = () => {
     res.status(200).json({ status: 'ok' });
   });
 
+  // Swagger Documentation endpoint
+  const openApiPath = path.resolve(__dirname, '../openapi.yaml');
+  if (fs.existsSync(openApiPath)) {
+    const file = fs.readFileSync(openApiPath, 'utf8');
+    const swaggerDoc = yaml.parse(file);
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+  }
+
   // Authentication routes
   app.use('/api/auth', authRoutes);
 
-  // Placeholder for documents routes (added in Phase 4)
-  // Placeholder for docs /api/docs (added in Phase 4)
+  // Documents workflow routes
+  app.use('/api/documents', documentsRoutes);
 
   // 404 handler for unknown routes
   app.use(notFound);
