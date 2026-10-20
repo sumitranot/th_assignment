@@ -400,7 +400,55 @@ _Candidate Notes:_ All architecture choices, atomic race-condition safety, and t
 
 ## 11. Deployment Guide
 
-### Backend on Render / Railway
+### Option A: Unified Full-Stack Deployment on Vercel (Recommended)
+
+The repository includes a root `vercel.json` and an `api/index.js` serverless bridge that enables deploying **both** the React frontend SPA and the Express backend API within a single Vercel project.
+
+#### 1. Provision a Cloud PostgreSQL Database
+
+Vercel is a serverless platform and requires an external or marketplace PostgreSQL database:
+
+- **Vercel Postgres / Neon** (Free tier available, one-click in Vercel Storage dashboard)
+- **Supabase** (Free managed PostgreSQL)
+- **Render / Railway PostgreSQL**
+
+Copy your connection string (`postgresql://<user>:<password>@<host>:5432/<dbname>?sslmode=require`).
+
+#### 2. Apply Database Migrations & Seed Initial Data
+
+Run the migration and seed command against your remote database from your local terminal:
+
+```bash
+DATABASE_URL="your-remote-postgres-connection-string" npm run db:deploy
+```
+
+This executes `prisma migrate deploy` followed by `node backend/prisma/seed.js` to create the schema and populate the demo accounts (`alice`, `bob`, `riley`, `rohan`).
+
+#### 3. Import Repository to Vercel
+
+1. In the Vercel Dashboard, click **Add New... > Project** and select this repository.
+2. Leave **Root Directory** as `./` (the monorepo root).
+3. Framework Preset: **Vite** (detected automatically).
+4. Build and Output Settings:
+   - Build Command: `npm run build` (runs `prisma generate` and `vite build`).
+   - Output Directory: `frontend/dist`.
+5. Configure Environment Variables in the Vercel Dashboard:
+   - `DATABASE_URL`: Your remote PostgreSQL connection string (with `?sslmode=require`).
+   - `JWT_SECRET`: A secure random string (at least 32 characters long).
+   - `NODE_ENV`: `production`.
+6. Click **Deploy**.
+
+Vercel will:
+
+- Build the React SPA into `frontend/dist`.
+- Route all `/api/*` requests to the `@vercel/node` serverless function in `api/index.js`.
+- Route all client-side navigation paths to `/index.html`.
+
+---
+
+### Option B: Split Deployment (Backend on Render, Frontend on Vercel)
+
+#### Backend on Render / Railway
 
 1. Create a Managed PostgreSQL instance.
 2. Deploy the `backend/` folder as a Web Service.
@@ -410,10 +458,10 @@ _Candidate Notes:_ All architecture choices, atomic race-condition safety, and t
    - `NODE_ENV`: `production`
    - `DATABASE_URL`: Your managed database connection string
    - `JWT_SECRET`: Secure 32+ character key
-   - `CLIENT_ORIGIN`: Your frontend URL
-   - `UPLOAD_DIR`: `/var/data/uploads` (or connect persistent disk / S3)
+   - `CLIENT_ORIGIN`: Your Vercel frontend URL
+   - `UPLOAD_DIR`: `/var/data/uploads` (or persistent disk)
 
-### Frontend on Vercel / Netlify
+#### Frontend on Vercel
 
 1. Connect repository with Root Directory set to `frontend`.
 2. Build Command: `npm run build`. Output Directory: `dist`.
