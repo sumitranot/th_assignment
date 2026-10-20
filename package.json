@@ -1,0 +1,21 @@
+{
+  "name": "document-approval-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Document Approval Workflow monorepo",
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "seed": "npm --prefix backend run seed",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "test": "npm --prefix backend run test:ci && npm --prefix frontend run test:ci",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "format": "prettier --write \"**/*.{js,jsx,json,md,css,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,json,md,css,yaml,yml}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prettier": "^3.3.3"
+  }
+}
