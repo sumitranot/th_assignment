@@ -3,7 +3,7 @@
 A production-grade, extensible full-stack Document Approval Workflow application built for evaluative assessment. The system enables submitters to submit documents (text and/or file attachments) and track review decisions, while reviewers can inspect submissions, download attachments, and record immutable approve/reject decisions with atomic race-condition safety.
 
 **Live URL:** https://thassignment.vercel.app  
-**Video walkthrough (Loom):** TODO
+**Video walkthrough (Loom):** https://www.loom.com/share/ac23e2c097024343abea1c4fd47cb9bb
 
 ---
 
