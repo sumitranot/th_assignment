@@ -24,8 +24,19 @@ const __dirname = path.dirname(__filename);
 export const createApp = () => {
   const app = express();
 
-  // Security headers
-  app.use(helmet());
+  // Security headers with Swagger CDN allowed
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          imgSrc: ["'self'", 'data:', 'https://validator.swagger.io'],
+        },
+      },
+    })
+  );
 
   // CORS configuration
   app.use(
@@ -78,7 +89,23 @@ export const createApp = () => {
   if (fs.existsSync(openApiPath)) {
     const file = fs.readFileSync(openApiPath, 'utf8');
     const swaggerDoc = yaml.parse(file);
-    app.use(['/api/docs', '/docs'], swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+
+    app.get(['/api/docs.json', '/api/openapi.json'], (_req, res) => {
+      res.status(200).json(swaggerDoc);
+    });
+
+    const swaggerOptions = {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'Document Approval Workflow API Docs',
+      customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui.min.css',
+      customJs: [
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui-bundle.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui-standalone-preset.min.js',
+      ],
+    };
+
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, swaggerOptions));
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, swaggerOptions));
   }
 
   // Authentication routes
