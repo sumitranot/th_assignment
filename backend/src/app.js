@@ -94,9 +94,6 @@ export const createApp = () => {
       res.status(200).json(swaggerDoc);
     });
 
-    app.get('/api/docs', (_req, res) => res.redirect(301, '/api/docs/'));
-    app.get('/docs', (_req, res) => res.redirect(301, '/api/docs/'));
-
     const swaggerOptions = {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'Document Approval Workflow API Docs',
